@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>APK DEPOT</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230E1114'/%3E%3Crect x='6' y='9' width='20' height='14' fill='none' stroke='%23E8EAEC' stroke-width='1.4'/%3E%3Cpath d='M16 12v6M13 15l3 3 3-3' stroke='%231B36C9' stroke-width='1.6'/%3E%3C/svg%3E">
+<style>
+/* ============ 设计 token ============ */
+:root{
+  --paper:#E8EAEC;
+  --paper-2:#F4F5F6;
+  --ink:#0E1114;
+  --muted:#5C636A;
+  --line:#C4CAD0;
+  --blue:#1B36C9;
+  --blue-soft:rgba(27,54,201,.07);
+  --yellow:#F2C230;
+  --ok:#177D46;
+  --bad:#B3261E;
+  --sans:"PingFang SC","Hiragino Sans GB","Noto Sans SC","Source Han Sans SC","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--paper);color:var(--ink);font-family:var(--sans);
+  font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:none}
+a{color:inherit}
+code,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* 制图网格底纹（独立装饰层） */
+.grid-layer{
+  position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(to right,rgba(14,17,20,.05) 1px,transparent 1px),
+    linear-gradient(to bottom,rgba(14,17,20,.05) 1px,transparent 1px);
+  background-size:40px 40px;
+  -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.85),rgba(0,0,0,0) 88%);
+  mask-image:linear-gradient(to bottom,rgba(0,0,0,.85),rgba(0,0,0,0) 88%);
+}
+/* 右侧竖向标注 */
+.rail{
+  position:fixed;right:26px;top:50%;transform:translateY(-50%);
+  writing-mode:vertical-rl;font-family:var(--mono);font-size:10px;
+  letter-spacing:.22em;color:rgba(14,17,20,.42);z-index:0;pointer-events:none;
+}
+
+.wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:0 24px}
+
+/* ============ 顶栏 ============ */
+.top{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:18px 0 16px;border-bottom:1px solid var(--ink);
+}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.mark{width:26px;height:26px;flex:none;color:var(--ink)}
+.word{display:block;font-family:var(--mono);font-size:12px;letter-spacing:.2em;line-height:1.1}
+.cn{display:block;font-size:11px;color:var(--muted);letter-spacing:.06em;margin-top:3px}
+.top-right{display:flex;align-items:center;gap:10px}
+.status{
+  display:inline-flex;align-items:center;gap:8px;padding:6px 11px;
+  border:1px solid var(--line);background:var(--paper-2);
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  max-width:62vw;overflow:hidden;white-space:nowrap;
+}
+.status i{width:6px;height:6px;flex:none;background:var(--yellow);display:block;transition:background .2s}
+.status[data-s="ready"] i{background:var(--ok)}
+.status[data-s="error"] i{background:var(--bad)}
+.status[data-s="loading"] i{animation:blink 1.1s steps(2,jump-none) infinite}
+@keyframes blink{50%{opacity:.25}}
+.status span{overflow:hidden;text-overflow:ellipsis}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  height:36px;padding:0 14px;border:1px solid var(--ink);
+  font-size:13px;letter-spacing:.02em;border-radius:2px;
+  transition:background .15s,color .15s,border-color .15s,transform .12s;
+  white-space:nowrap;
+}
+.btn:hover{background:var(--ink);color:var(--paper)}
+.btn:active{transform:translateY(1px)}
+.btn.solid{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.solid:hover{background:var(--blue-ink,#12248C);border-color:#12248C;color:#fff}
+.btn.ghost{border-color:var(--line);background:var(--paper-2);color:var(--ink)}
+.btn.text{border-color:transparent;color:var(--muted);padding:0 10px;height:34px}
+.btn.text:hover{background:none;color:var(--blue);text-decoration:underline;text-underline-offset:3px}
+.btn.text.danger{color:var(--bad)}
+.btn.text.danger:hover{color:var(--bad);text-decoration-color:var(--bad)}
+.btn.text.danger.confirm{
+  background:var(--bad);border-color:var(--bad);color:#fff;text-decoration:none;
+}
+.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.btn:focus-visible,.bay:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{
+  outline:2px solid var(--blue);outline-offset:2px;
+}
+.icon-btn{
+  width:36px;height:36px;border:1px solid var(--line);background:var(--paper-2);
+  display:grid;place-items:center;border-radius:2px;transition:.15s;
+}
+.icon-btn:hover{border-color:var(--ink);background:#fff}
+
+/* ============ 主区 ============ */
+.hero{
+  display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);
+  gap:56px;padding:52px 0 46px;
+}
+.kicker{
+  display:flex;align-items:center;gap:10px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--muted);
+  margin-bottom:22px;
+}
+.kicker::after{content:"";flex:1;height:1px;background:var(--line);max-width:72px}
+h1{
+  font-size:clamp(33px,4.6vw,58px);line-height:1.14;font-weight:800;
+  letter-spacing:-.025em;margin-bottom:20px;
+}
+h1 em{font-style:normal;color:var(--blue)}
+.lede{font-size:15px;line-height:1.75;color:var(--muted);max-width:34em;margin-bottom:30px}
+.lede code{color:var(--ink);background:rgba(14,17,20,.06);padding:1px 5px;font-size:.9em}
+
+/* 投递舱 */
+.bay{
+  position:relative;border:1px solid var(--ink);background:var(--paper-2);
+  padding:38px 22px 30px;text-align:center;
+  transition:background .18s,border-color .18s;
+}
+.bay:hover{background:#fff}
+.bay.over{background:var(--blue-soft);border-color:var(--blue)}
+.corner{position:absolute;width:13px;height:13px;border:2px solid var(--blue);transition:transform .18s}
+.corner.tl{top:-1px;left:-1px;border-right:0;border-bottom:0}
+.corner.tr{top:-1px;right:-1px;border-left:0;border-bottom:0}
+.corner.bl{bottom:-1px;left:-1px;border-right:0;border-top:0}
+.corner.br{bottom:-1px;right:-1px;border-left:0;border-top:0}
+.bay.over .corner{transform:scale(1.28)}
+.bay-inner{position:relative;display:flex;flex-direction:column;align-items:center;gap:12px}
+.bay-icon{width:40px;height:40px;color:var(--blue)}
+.bay-title{font-size:19px;font-weight:700;letter-spacing:-.01em}
+.bay-sub{font-size:13px;color:var(--muted)}
+.bay .btn{margin-top:6px}
+.bay-meta{
+  position:relative;display:flex;justify-content:center;gap:14px;flex-wrap:wrap;
+  margin-top:22px;padding-top:14px;border-top:1px dashed var(--line);
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--muted);
+}
+.bay-meta span{display:inline-flex;align-items:center;gap:6px}
+
+/* 上传队列 */
+.queue{display:flex;flex-direction:column;gap:9px;margin-top:16px}
+.q-row{
+  border:1px solid var(--line);background:#fff;padding:11px 14px 12px;
+}
+.q-top{display:flex;align-items:baseline;gap:12px}
+.q-name{
+  min-width:0;flex:1;font-size:13.5px;font-weight:600;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.q-pct{font-family:var(--mono);font-size:11px;color:var(--muted);flex:none}
+.q-track{margin-top:9px;height:2px;background:var(--line);position:relative;overflow:hidden}
+.q-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--blue);transition:width .25s}
+.q-row[data-s="done"] .q-fill{background:var(--ok)}
+.q-row[data-s="error"] .q-fill{background:var(--bad);width:100%!important}
+.q-msg{margin-top:7px;font-size:11.5px;color:var(--muted);line-height:1.5}
+.q-row[data-s="error"] .q-msg{color:var(--bad)}
+.q-cancel{
+  font-family:var(--mono);font-size:10.5px;color:var(--muted);
+  border-bottom:1px solid var(--line);flex:none;
+}
+.q-cancel:hover{color:var(--blue);border-color:var(--blue)}
+
+/* 仓库侧栏 */
+.side{border-left:1px solid var(--line);padding-left:36px;display:flex;flex-direction:column}
+.stat{padding:16px 0;border-bottom:1px solid var(--line);display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.stat:first-of-type{padding-top:0}
+.stat-label{font-size:12px;color:var(--muted);letter-spacing:.04em;padding-bottom:3px}
+.stat-value{font-family:var(--mono);font-size:30px;line-height:1;font-weight:500;letter-spacing:-.03em}
+.stat-value small{font-size:11px;color:var(--muted);margin-left:4px;letter-spacing:.04em}
+.stat-value.sm{font-size:17px;letter-spacing:-.01em}
+.loc{margin-top:18px;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-family:var(--mono);font-size:11px;color:var(--muted)}
+.loc b{color:var(--ink);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini{
+  margin-top:16px;display:flex;flex-direction:column;gap:0;
+  border-top:1px dashed var(--line);
+}
+.mini div{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:9px 0;border-bottom:1px dashed var(--line);
+  font-size:12px;color:var(--muted);
+}
+.mini b{color:var(--ink);font-weight:500;font-size:12px;text-align:right}
+.side-note{margin-top:auto;padding-top:22px;font-size:12px;line-height:1.75;color:var(--muted)}
+.flow{margin-top:18px;padding-top:14px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:13px}
+.flow .st{display:grid;grid-template-columns:19px minmax(0,1fr);gap:11px}
+.flow .st>span{
+  font-family:var(--mono);font-size:9.5px;color:var(--blue);
+  border:1px solid var(--line);width:19px;height:19px;display:grid;place-items:center;margin-top:1px;
+}
+.flow .st b{display:block;font-size:12.5px;font-weight:600;line-height:1.5}
+.flow .st em{display:block;font-style:normal;font-size:11.5px;color:var(--muted);line-height:1.65}
+.side-note code{color:var(--ink)}
+
+/* ============ 清单 ============ */
+.manifest{border-top:1px solid var(--ink);padding:38px 0 40px}
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:24px}
+.sec-head .kicker{margin-bottom:0}
+.tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.search{
+  height:36px;width:210px;max-width:52vw;border:1px solid var(--line);background:var(--paper-2);
+  padding:0 11px;font-size:13px;border-radius:2px;
+}
+.search::placeholder{color:#8B9299}
+.search:focus{background:#fff;border-color:var(--ink)}
+.sel{
+  height:36px;border:1px solid var(--line);background:var(--paper-2);
+  padding:0 8px;font-size:12.5px;border-radius:2px;
+}
+.sel:focus{background:#fff;border-color:var(--ink)}
+
+.thead{
+  display:grid;grid-template-columns:52px minmax(0,1fr) 104px 128px 186px;
+  gap:14px;padding:0 12px 9px;border-bottom:1px solid var(--ink);
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--muted);
+}
+.thead>div:nth-child(3),.thead>div:nth-child(4){text-align:right}
+.thead>div:last-child{text-align:right}
+
+.rows{display:flex;flex-direction:column}
+.row{
+  display:grid;grid-template-columns:52px minmax(0,1fr) 104px 128px 186px;
+  gap:14px;align-items:center;padding:15px 12px;border-bottom:1px solid var(--line);
+  transition:background .14s;
+}
+.row:hover{background:#fff}
+.row:hover .idx{color:var(--blue)}
+.idx{font-family:var(--mono);font-size:11px;color:#9AA1A8;transition:color .14s}
+.fname{min-width:0;display:flex;align-items:center;gap:8px}
+.fname b{
+  font-size:14.5px;font-weight:600;letter-spacing:-.005em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.tag-new{
+  flex:none;font-family:var(--mono);font-size:9px;letter-spacing:.1em;
+  background:var(--yellow);color:#231A00;padding:2px 5px;border-radius:1px;
+}
+.fsize,.fdate{font-family:var(--mono);font-size:11.5px;color:var(--muted);text-align:right;white-space:nowrap}
+.facts{display:flex;align-items:center;justify-content:flex-end;gap:4px}
+.facts .btn{height:34px;padding:0 13px;font-size:12.5px}
+
+.empty{padding:54px 12px 46px;text-align:center;border-bottom:1px solid var(--line)}
+.empty-icon{width:34px;height:34px;color:#A7AEB5;margin:0 auto 14px}
+.empty p{font-size:14px;font-weight:600;margin-bottom:6px}
+.empty small{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em}
+.loading-bar{
+  height:2px;background:var(--line);position:relative;overflow:hidden;margin-top:-1px;
+}
+.loading-bar::after{
+  content:"";position:absolute;top:0;bottom:0;left:-40%;width:40%;background:var(--blue);
+  animation:slide 1.2s ease-in-out infinite;
+}
+@keyframes slide{0%{left:-40%}100%{left:100%}}
+
+/* ============ 页脚 ============ */
+.foot{
+  border-top:1px solid var(--ink);padding:22px 0 40px;
+  display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;
+  font-size:12px;color:var(--muted);line-height:1.8;
+}
+.foot .mono{font-size:10.5px;letter-spacing:.12em;color:var(--ink)}
+.foot p{max-width:56em}
+
+/* ============ 配置抽屉 ============ */
+.scrim{
+  position:fixed;inset:0;background:rgba(14,17,20,.32);z-index:40;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{
+  position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);z-index:41;
+  background:var(--paper);border-left:1px solid var(--ink);
+  transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;
+}
+.drawer.on{transform:none}
+.drawer-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:18px 20px;border-bottom:1px solid var(--ink);
+}
+.drawer-head .kicker{margin:0}
+.drawer-body{padding:20px;overflow-y:auto;flex:1}
+.field{margin-bottom:16px}
+.field label{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:7px}
+.field input{
+  width:100%;height:38px;border:1px solid var(--line);background:#fff;
+  padding:0 11px;font-size:13px;border-radius:2px;
+}
+.field input:focus{border-color:var(--ink);outline:none;box-shadow:0 0 0 2px var(--blue-soft)}
+.field .hint{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.6}
+.drawer-actions{display:flex;gap:10px;margin:6px 0 22px}
+details.setup{border-top:1px solid var(--line);padding-top:16px}
+summary{
+  cursor:pointer;font-size:13px;font-weight:600;list-style:none;
+  display:flex;align-items:center;gap:8px;
+}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"+";font-family:var(--mono);color:var(--blue);font-size:13px}
+details[open] summary::before{content:"−"}
+.steps{margin:14px 0 0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+.steps li{font-size:12.5px;line-height:1.7;color:var(--muted);padding-left:22px;position:relative}
+.steps li::before{
+  content:attr(data-n);position:absolute;left:0;top:0;
+  font-family:var(--mono);font-size:10px;color:var(--blue);
+  border:1px solid var(--line);width:15px;height:15px;display:grid;place-items:center;margin-top:3px;
+}
+.steps li b{color:var(--ink)}
+.sql{
+  margin-top:14px;border:1px solid var(--line);background:#fff;
+  font-family:var(--mono);font-size:11px;line-height:1.75;color:#1E2429;
+  padding:12px;overflow-x:auto;white-space:pre;
+}
+.sql-head{display:flex;justify-content:space-between;align-items:center;margin-top:18px}
+.sql-head span{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;color:var(--muted)}
+.warn{
+  margin-top:16px;border-left:2px solid var(--yellow);background:rgba(242,194,48,.12);
+  padding:10px 12px;font-size:12px;line-height:1.7;color:#4A3D12;
+}
+
+/* ============ 配置密码锁 ============ */
+.gate{
+  position:fixed;inset:0;z-index:70;display:grid;place-items:center;
+  background:rgba(14,17,20,.44);opacity:0;pointer-events:none;transition:opacity .18s;
+}
+.gate.on{opacity:1;pointer-events:auto}
+.gate-box{
+  position:relative;width:min(400px,calc(100vw - 32px));background:var(--paper);
+  border:1px solid var(--ink);padding:22px 24px 24px;
+  transform:translateY(10px);transition:transform .2s;
+}
+.gate.on .gate-box{transform:none}
+.gate-box::before,.gate-box::after{
+  content:"";position:absolute;width:12px;height:12px;border:2px solid var(--blue);
+}
+.gate-box::before{top:-1px;left:-1px;border-right:0;border-bottom:0}
+.gate-box::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
+.gate-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.gate-head span{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--muted)}
+.gate h2{font-size:22px;font-weight:800;letter-spacing:-.02em;margin-bottom:8px}
+.gate-sub{font-size:12.5px;line-height:1.7;color:var(--muted);margin-bottom:18px}
+.gate-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--muted);margin-bottom:7px}
+.pw-field{position:relative;margin-bottom:10px}
+.pw-field input{
+  width:100%;height:40px;border:1px solid var(--line);background:#fff;
+  padding:0 56px 0 11px;font-size:13px;border-radius:2px;letter-spacing:.02em;
+}
+.pw-field input:focus{border-color:var(--ink);outline:none;box-shadow:0 0 0 2px var(--blue-soft)}
+.eye{
+  position:absolute;right:6px;top:50%;transform:translateY(-50%);
+  font-family:var(--mono);font-size:10.5px;color:var(--muted);
+  padding:4px 7px;border-radius:2px;
+}
+.eye:hover{color:var(--blue);background:var(--blue-soft)}
+.gate-msg{
+  min-height:18px;font-size:11.5px;line-height:1.6;color:var(--bad);
+  font-family:var(--mono);letter-spacing:.02em;margin-bottom:12px;
+}
+.gate-actions{display:flex;gap:8px}
+.gate-actions .btn{flex:1}
+
+/* toast */
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);z-index:60;
+  background:var(--ink);color:var(--paper);font-size:13px;
+  padding:10px 16px;border-radius:2px;max-width:88vw;text-align:center;
+  opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;
+}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.bad{background:var(--bad)}
+
+/* ============ 响应式 ============ */
+@media (max-width:980px){
+  .hero{grid-template-columns:1fr;gap:34px;padding:38px 0 34px}
+  .side{border-left:0;border-top:1px solid var(--line);padding:26px 0 0}
+  .rail{display:none}
+  .side-note{margin-top:18px}
+  .thead{grid-template-columns:40px minmax(0,1fr) 118px}
+  .thead>div:nth-child(3){text-align:right}
+  .thead>div:nth-child(4),.thead>div:last-child{display:none}
+}
+@media (max-width:720px){
+  .wrap{padding:0 16px}
+  .top{padding:14px 0}
+  .brand .cn{display:none}
+  .status{font-size:10px;padding:5px 8px;max-width:34vw}
+  .bay{padding:28px 16px 24px}
+  .bay-title{font-size:17px}
+  .bay-meta{flex-direction:column;gap:5px;font-size:10px;letter-spacing:.08em;line-height:1.7}
+  h1{font-size:clamp(28px,8.4vw,40px)}
+  .sec-head{gap:12px}
+  .tools{width:100%}
+  .search{flex:1;width:auto;max-width:none}
+  .thead{display:none}
+  .row{
+    grid-template-columns:minmax(0,1fr) 106px;
+    grid-template-areas:"name size" "date date" "acts acts";
+    row-gap:7px;padding:14px 6px;
+  }
+  .row .idx{display:none}
+  .fname{grid-area:name}
+  .fname b{font-size:14px;white-space:normal;word-break:break-all;line-height:1.4}
+  .fsize{grid-area:size;text-align:right;align-self:start}
+  .fdate{grid-area:date;text-align:left;font-size:10.5px}
+  .facts{grid-area:acts;justify-content:flex-end;margin-top:2px}
+  .facts .btn{height:36px}
+  .drawer{width:100vw}
+  .foot{flex-direction:column;gap:14px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+<div class="grid-layer" aria-hidden="true"></div>
+<div class="rail" aria-hidden="true">SUPABASE STORAGE · PUBLIC BUCKET</div>
+
+<div class="wrap">
+  <!-- 顶栏 -->
+  <header class="top">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
+        <rect x="3.5" y="3.5" width="17" height="17"/>
+        <path d="M12 7.5v7.5M8.7 11.7 12 15l3.3-3.3" stroke="#1B36C9"/>
+      </svg>
+      <div>
+        <span class="word">APK DEPOT</span>
+        <span class="cn">安装包分发仓</span>
+      </div>
+    </div>
+    <div class="top-right">
+      <div class="status" id="status" data-s="loading" aria-live="polite">
+        <i></i><span id="status-text">连接中</span>
+      </div>
+      <button class="btn ghost" id="btn-cfg" type="button" title="需要超级管理员密码">配置</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 投递 -->
+    <section class="hero" aria-labelledby="h1">
+      <div class="hero-left">
+        <div class="kicker"></div>
+        <h1 id="h1"><br><em>资源库</em></h1>
+        <p class="lede">
+          <code id="path-hint"></code>
+        </p>
+
+        <div class="bay" id="bay" role="button" tabindex="0" aria-label="拖入或点击选择 APK 文件">
+          <span class="corner tl"></span><span class="corner tr"></span>
+          <span class="corner bl"></span><span class="corner br"></span>
+          <div class="bay-inner">
+            <svg class="bay-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
+              <path d="M4 15v4.5h16V15" stroke="#0E1114"/>
+              <path d="M12 4v9M8 9.5 12 13.5l4-4" stroke="#1B36C9" stroke-width="1.6"/>
+            </svg>
+            <div class="bay-title">只能上传 .apk 文件</div>
+            <div class="bay-sub">或点击这里选择文件 · 支持一次多个</div>
+            <button class="btn solid" type="button" tabindex="-1" id="btn-pick">选择 APK</button>
+          </div>
+          <div class="bay-meta">
+            <span>ONLY .APK</span>
+            <span></span>
+          </div>
+        </div>
+        <input type="file" id="file" accept=".apk,application/vnd.android.package-archive" multiple hidden>
+        <div class="queue" id="queue" aria-live="polite"></div>
+      </div>
+
+      <aside class="side" aria-labelledby="stock-h">
+        <div class="kicker" id="stock-h">仓库 / STOCK</div>
+        <div class="stat">
+          <span class="stat-label">安装包</span>
+          <span class="stat-value" id="stat-count">—<small>个</small></span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">总占用</span>
+          <span class="stat-value" id="stat-size">—</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">最近更新</span>
+          <span class="stat-value sm" id="stat-date">—</span>
+        </div>
+        <div class="loc">
+          <span>路径</span>
+          <b id="loc-path">files / apk</b>
+        </div>
+        <div class="mini">
+          <div><span>传输</span><b>大爷 6 MB 分片续传</b></div>
+          <div><span>下载</span><b>签名直链</b></div>
+          <div><span>重名</span><b>覆盖旧包</b></div>
+          <div><span>中文名</span><b>原名还原</b></div>
+        </div>
+        <div class="flow">
+          <div class="st"><span>01</span><div><b>选择安装包</b><em>拖入或点选，可一次多个</em></div></div>
+          <div class="st"><span>02</span><div><b>落进 Storage</b><em>存入当前目录，保留原文件名</em></div></div>
+          <div class="st"><span>03</span><div><b>浏览器下载</b><em>签名直链，点一下直接落盘</em></div></div>
+        </div>
+        <p class="side-note">
+         <code></code>
+        </p>
+      </aside>
+    </section>
+
+    <!-- 清单 -->
+    <section class="manifest" aria-labelledby="manifest-h">
+      <div class="sec-head">
+        <div class="kicker" id="manifest-h">清单 / MANIFEST</div>
+        <div class="tools">
+          <input class="search" id="q" type="search" placeholder="搜索文件名" autocomplete="off">
+          <select class="sel" id="sort" aria-label="排序方式">
+            <option value="time">按时间</option>
+            <option value="name">按名称</option>
+            <option value="size">按大小</option>
+          </select>
+          <button class="icon-btn" id="btn-refresh" type="button" title="重新读取仓库" aria-label="刷新清单">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path d="M20 11a8 8 0 1 1-2.4-5.7"/><path d="M20 4v7h-7"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="thead" aria-hidden="true">
+        <div>#</div><div>文件名</div><div>大小</div><div>更新时间</div><div>操作</div>
+      </div>
+      <div id="list"><div class="loading-bar" role="status" aria-label="正在读取仓库"></div></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span class="mono">APK DEPOT</span>
+    <p>
+      <code class="mono" id="foot-path"></code>
+    </p>
+  </footer>
+</div>
+
+<!-- 配置抽屉 -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true" aria-label="连接配置">
+  <div class="drawer-head">
+    <div class="kicker">连接配置 / CONFIG</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="btn text" id="btn-lock" type="button" title="立即重新上锁">锁定</button>
+      <button class="icon-btn" id="btn-close" type="button" aria-label="关闭配置">
+      <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="1.6" fill="none" aria-hidden="true">
+        <path d="M6 6l12 12M18 6 6 18"/>
+      </svg>
+      </button>
+    </div>
+  </div>
+  <div class="drawer-body">
+    <div class="field">
+      <label for="c-url">PROJECT URL</label>
+      <input id="c-url" type="url" spellcheck="false" placeholder="https://xxxx.supabase.co">
+    </div>
+    <div class="field">
+      <label for="c-key">PUBLISHABLE / ANON KEY</label>
+      <div class="pw-field">
+        <input id="c-key" type="password" spellcheck="false" placeholder="sb_publishable_…" autocomplete="off">
+        <button class="eye" id="btn-eye" type="button" aria-label="显示或隐藏密钥">显示</button>
+      </div>
+      <p class="hint">默认掩码显示。这类 publishable 密钥本身是公开的，锁保护的是「改配置」这个动作；请勿填 service_role 密钥。</p>
+    </div>
+    <div class="field">
+      <label for="c-bucket">BUCKET（存储桶）</label>
+      <input id="c-bucket" type="text" spellcheck="false" placeholder="files">
+      <p class="hint">建议设为 <b>public</b>；即使是私有桶，只要 anon 有 select 权限，签名直链依然可用。</p>
+    </div>
+    <div class="field">
+      <label for="c-folder">FOLDER（文件夹）</label>
+      <input id="c-folder" type="text" spellcheck="false" placeholder="apk">
+      <p class="hint">APK 存进这个目录，留空则放桶根目录。中文名会转成 ASCII 键，原名记录在同目录 <code>_manifest.json</code>。</p>
+    </div>
+    <div class="drawer-actions">
+      <button class="btn solid" id="btn-save" type="button">保存并重连</button>
+      <button class="btn text" id="btn-reset" type="button">恢复默认</button>
+    </div>
+
+    <details class="setup">
+      <summary>首次部署：三步</summary>
+      <ol class="steps">
+        <li data-n="1"><b>建桶</b>：Storage → New bucket，名称与上面一致，勾选 Public。</li>
+        <li data-n="2"><b>开写权限</b>：由于页面没有登录，需要给 anon 加 insert / select 策略，SQL 见下。</li>
+        <li data-n="3"><b>调上限</b>：Storage → Settings 里把单文件上限调到装得下最大的包（免费版默认 50 MB）。</li>
+      </ol>
+      <div class="sql-head">
+        <span>POLICY SQL</span>
+        <button class="btn text" id="btn-copy-sql" type="button">复制</button>
+      </div>
+      <pre class="sql" id="sql">-- 1. 建桶（已存在则跳过）
+insert into storage.buckets (id, name, public)
+values ('files','files',true)
+on conflict (id) do nothing;
+
+-- 2. 允许匿名读取（下载用）
+drop policy if exists "apk_anon_select" on storage.objects;
+create policy "apk_anon_select" on storage.objects
+for select to anon
+using (bucket_id = 'files');
+
+-- 3. 允许匿名写入，仅限  目录
+drop policy if exists "apk_anon_insert" on storage.objects;
+create policy "apk_anon_insert" on storage.objects
+for insert to anon
+with check (
+  bucket_id = 'files'
+  and (storage.foldername(name))[1] = 'apk'
+);</pre>
+      <div class="warn">
+        匿名写入意味着任何人都能上传、占满配额。对外长期使用建议改成登录后上传，或改用私有桶 + Edge Function 签发上传凭证。
+      </div>
+    </details>
+  </div>
+</aside>
+
+<div class="gate" id="gate" aria-hidden="true">
+  <div class="gate-box" role="dialog" aria-modal="true" aria-labelledby="gate-title">
+    <div class="gate-head">
+      <span>SUPER ADMIN · CONFIG</span>
+      <button class="icon-btn" id="gate-close" type="button" aria-label="关闭" style="width:28px;height:28px">
+        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.8" fill="none" aria-hidden="true">
+          <path d="M6 6l12 12M18 6 6 18"/>
+        </svg>
+      </button>
+    </div>
+    <h2 id="gate-title">配置已加密</h2>
+    <p class="gate-sub">连接参数被超级管理员密码锁住。输入 FileHub 后台那个超级管理员密码才能查看和修改。</p>
+    <label class="gate-label" for="gate-pass">PASSWORD</label>
+    <div class="pw-field">
+      <input id="gate-pass" type="password" autocomplete="current-password" placeholder="超级管理员密码">
+      <button class="eye" id="gate-eye" type="button" aria-label="显示或隐藏密码">显示</button>
+    </div>
+    <div class="gate-msg" id="gate-msg"></div>
+    <div class="gate-actions">
+      <button class="btn solid" id="gate-ok" type="button">解锁</button>
+      <button class="btn text" id="gate-cancel" type="button">取消</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://fastly.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://fastly.jsdelivr.net/npm/tus-js-client@4/dist/tus.min.js"></script>
+<script>
+/* ============================================================
+   APK DEPOT · 前端逻辑
+   数据链路：Supabase Storage → <bucket>/<folder>/
+   上传：>6MB 走 TUS 分片续传，其余走标准上传
+   下载：签名直链（带 attachment 头），浏览器直接落盘
+   ============================================================ */
+
+const DEFAULTS = {
+  url: 'https://gykqzvmjohilsxzopdwe.supabase.co',
+  key: 'sb_publishable_4SuKagnYKc8bwCGo_FbzWg_UwMivbEB',
+  bucket: 'files',
+  folder: 'apk'
+};
+const CFG_KEY = 'apk-depot:config:v1';
+const MIME = 'application/vnd.android.package-archive';
+const CHUNK = 6 * 1024 * 1024;
+
+let cfg = loadCfg();
+let sb = null;
+let items = [];
+let loading = true;
+let errMsg = '';
+let query = '';
+let sortBy = 'time';
+let uploads = [];
+
+/* ---------- 配置 ---------- */
+function loadCfg(){
+  try{
+    const raw = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
+    return {
+      url: (raw.url || DEFAULTS.url).trim().replace(/\/+$/,''),
+      key: (raw.key || DEFAULTS.key).trim(),
+      bucket: (raw.bucket || DEFAULTS.bucket).trim(),
+      folder: (raw.folder != null ? String(raw.folder) : DEFAULTS.folder).trim().replace(/^\/+|\/+$/g,'')
+    };
+  }catch(e){ return {...DEFAULTS}; }
+}
+function saveCfg(next){
+  cfg = next;
+  localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+  mount();
+}
+
+/* ---------- 客户端 ---------- */
+function mount(){
+  if(!window.supabase){ setStatus('error','Supabase SDK 加载失败'); return; }
+  sb = supabase.createClient(cfg.url, cfg.key, {
+    auth: { persistSession:false, autoRefreshToken:false, detectSessionInUrl:false }
+  });
+  updatePaths();
+  refresh();
+}
+function updatePaths(){
+  const p = cfg.folder ? cfg.folder : '（桶根目录）';
+  document.getElementById('loc-path').textContent = cfg.bucket + ' / ' + p;
+  document.getElementById('path-hint').textContent = (cfg.folder || '根目录') + '/';
+  document.getElementById('foot-path').textContent = (cfg.folder || '桶根') + '/';
+  renderSql();
+}
+
+/* 按当前 bucket / folder 生成可执行策略 SQL */
+function renderSql(){
+  const b = cfg.bucket;
+  const f = cfg.folder || '';
+  const scope = f ? `\n  and (storage.foldername(name))[1] = '${f}'` : '';
+  document.getElementById('sql').textContent =
+`-- 1. 建桶（已存在则跳过）
+insert into storage.buckets (id, name, public)
+values ('${b}','${b}',true)
+on conflict (id) do nothing;
+
+-- 2. 允许匿名读取（下载用）
+drop policy if exists "apk_anon_select" on storage.objects;
+create policy "apk_anon_select" on storage.objects
+for select to anon
+using (bucket_id = '${b}');
+
+-- 3. 允许匿名写入${f ? '，仅限 ' + f + '/ 目录' : ''}
+drop policy if exists "apk_anon_insert" on storage.objects;
+create policy "apk_anon_insert" on storage.objects
+for insert to anon
+with check (
+  bucket_id = '${b}'${scope}
+);`;
+}
+
+/* ---------- 状态 ---------- */
+function setStatus(s, text){
+  const el = document.getElementById('status');
+  el.dataset.s = s;
+  document.getElementById('status-text').textContent =
+    text || (s === 'ready' ? `已连接 · ${cfg.bucket}` : s === 'error' ? '连接失败' : '连接中');
+}
+let toastTimer;
+function toast(msg, bad){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.toggle('bad', !!bad);
+  el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('on'), 2600);
+}
+
+/* ---------- 工具 ---------- */
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtSize(b){
+  b = Number(b) || 0;
+  if(!b) return '0 B';
+  const u = ['B','KB','MB','GB','TB'];
+  const i = Math.min(u.length - 1, Math.floor(Math.log(b) / Math.log(1024)));
+  const v = b / Math.pow(1024, i);
+  return (i === 0 ? v : v.toFixed(v >= 10 ? 1 : 2)) + ' ' + u[i];
+}
+function fmtDate(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '—';
+  const p = n => String(n).padStart(2,'0');
+  return `${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+/* Supabase 的 object key 只接受 ASCII，所以存储层用「可读 slug + 原文哈希」，
+   真实文件名记录在目录下的 _manifest.json 里，下载时再还原。 */
+function hash8(str){
+  let h = 2166136261;
+  for(let i = 0; i < str.length; i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(16).padStart(8,'0');
+}
+function storageKey(name){
+  const raw = String(name).trim();
+  const base = raw.replace(/\.apk$/i,'')
+    .replace(/[^\x20-\x7E]/g,'')            // 丢掉非 ASCII 部分
+    .replace(/[^A-Za-z0-9._-]+/g,'-')
+    .replace(/-+/g,'-')
+    .replace(/^[-_.]+|[-_.]+$/g,'')
+    .slice(0, 48) || 'package';
+  return base + '-' + hash8(raw) + '.apk';
+}
+function fullPath(name){
+  return (cfg.folder ? cfg.folder + '/' : '') + name;
+}
+function manifestPath(){ return fullPath('_manifest.json'); }
+function isApk(name){ return /\.apk$/i.test(String(name)); }
+
+/* ---------- 读取清单 ---------- */
+let manifest = {};
+async function loadManifest(){
+  try{
+    const { data, error } = await sb.storage.from(cfg.bucket).download(manifestPath());
+    if(error || !data) return;
+    const txt = await data.text();
+    const obj = JSON.parse(txt);
+    /* 合并而非覆盖：上传中的新条目不能被一次旧读取冲掉 */
+    if(obj && typeof obj === 'object') manifest = Object.assign({}, manifest, obj);
+  }catch(e){ /* 清单缺失时退回显示存储 key */ }
+}
+let manifestChain = Promise.resolve();
+function writeManifest(key, originalName){
+  manifest[key] = { name: originalName, at: new Date().toISOString() };
+  const payload = JSON.stringify(manifest, null, 2);
+  /* 串行写入，避免一次拖入多个包时互相覆盖清单 */
+  manifestChain = manifestChain.then(async () => {
+    const blob = new Blob([payload], { type:'application/json' });
+    const { error } = await sb.storage.from(cfg.bucket).upload(manifestPath(), blob, {
+      contentType: 'application/json', upsert: true, cacheControl: 'no-cache'
+    });
+    if(error) console.warn('manifest 写入失败：', error.message);
+  });
+  return manifestChain;
+}
+
+function dropFromManifest(key){
+  const snapshot = Object.assign({}, manifest);
+  delete manifest[key];
+  const payload = JSON.stringify(manifest, null, 2);
+  manifestChain = manifestChain.then(async () => {
+    const blob = new Blob([payload], { type:'application/json' });
+    const { error } = await sb.storage.from(cfg.bucket).upload(manifestPath(), blob, {
+      contentType: 'application/json', upsert: true, cacheControl: 'no-cache'
+    });
+    if(error){ manifest = snapshot; console.warn('manifest 写入失败：', error.message); }
+  });
+  return manifestChain;
+}
+
+let refreshSeq = 0;
+async function refresh(){
+  if(!sb) return;
+  const seq = ++refreshSeq;
+  loading = true;
+  errMsg = '';
+  renderList();
+  setStatus('loading');
+  try{
+    const { data, error } = await sb.storage.from(cfg.bucket).list(cfg.folder, {
+      limit: 300,
+      sortBy: { column: 'created_at', order: 'desc' }
+    });
+    if(error) throw error;
+    await loadManifest();
+    const next = (data || [])
+      .filter(o => o && o.id && isApk(o.name))
+      .map(o => ({
+        key: o.name,
+        name: (manifest[o.name] && manifest[o.name].name) || o.name,
+        path: fullPath(o.name),
+        size: (o.metadata && o.metadata.size) || 0,
+        date: o.updated_at || o.created_at || ''
+      }));
+    if(seq !== refreshSeq) return;   /* 已有更新的刷新在跑，丢弃这次结果，连 items 也不能写 */
+    items = next;
+    setStatus('ready');
+  }catch(e){
+    if(seq !== refreshSeq) return;
+    errMsg = humanError(e);
+    items = [];
+    setStatus('error', '连接失败');
+  }
+  loading = false;
+  renderAll();
+}
+
+function humanError(e){
+  const m = (e && (e.message || e.error_description || e.error)) || String(e || '未知错误');
+  if(/bucket not found/i.test(m)) return '找不到存储桶「' + cfg.bucket + '」，检查名称或先建桶';
+  if(/row-level security|permission|not authorized|Unauthorized/i.test(m))
+    return '权限被拦截：需要给 anon 角色加 Storage 策略，见配置面板底部 SQL';
+  if(/Failed to fetch|NetworkError|Load failed/i.test(m)) return '网络或 CORS 异常，检查 Project URL 是否正确';
+  return m;
+}
+
+/* ---------- 渲染 ---------- */
+function renderAll(){ renderStats(); renderList(); }
+
+function renderStats(){
+  const noData = loading || !!errMsg;
+  const count = items.length;
+  const total = items.reduce((s, it) => s + (it.size || 0), 0);
+  const latest = items.reduce((d, it) => {
+    const t = new Date(it.date || 0).getTime();
+    return t > d ? t : d;
+  }, 0);
+  document.getElementById('stat-count').innerHTML =
+    (noData ? '—' : String(count)) + '<small>个</small>';
+  document.getElementById('stat-size').innerHTML = noData ? '—' :
+    (total >= 1024 * 1024 * 1024
+      ? (total / 1024 / 1024 / 1024).toFixed(2) + '<small>GB</small>'
+      : (total / 1024 / 1024).toFixed(1) + '<small>MB</small>');
+  document.getElementById('stat-date').textContent =
+    noData || !latest ? '—' : fmtDate(new Date(latest).toISOString());
+}
+
+function visibleItems(){
+  const q = query.trim().toLowerCase();
+  let list = items.filter(it => !q || it.name.toLowerCase().includes(q));
+  const byTime = (a,b) => new Date(b.date||0) - new Date(a.date||0);
+  if(sortBy === 'name') list.sort((a,b) => a.name.localeCompare(b.name, 'zh-Hans-CN'));
+  else if(sortBy === 'size') list.sort((a,b) => (b.size||0) - (a.size||0));
+  else list.sort(byTime);
+  return list;
+}
+
+function renderList(){
+  const box = document.getElementById('list');
+  if(loading){
+    box.innerHTML = '<div class="loading-bar" role="status" aria-label="正在读取仓库"></div>';
+    return;
+  }
+  if(errMsg){
+    box.innerHTML = `
+      <div class="empty">
+        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+          <circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.3v.2"/>
+        </svg>
+        <p>读不到仓库</p>
+        <small>${esc(errMsg)}</small>
+      </div>`;
+    return;
+  }
+  const list = visibleItems();
+  if(!list.length){
+    box.innerHTML = `
+      <div class="empty">
+        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+          <path d="M3.5 8.5 12 4l8.5 4.5v7L12 20 3.5 15.5z"/><path d="M3.5 8.5 12 13l8.5-4.5M12 13v7"/>
+        </svg>
+        <p>${query ? '没有匹配的安装包' : '仓里还没有安装包'}</p>
+        <small>${query ? '换个关键词试试' : '把 .apk 拖进上方投递舱即可入库'}</small>
+      </div>`;
+    return;
+  }
+  const newest = list.reduce((a,b) => {
+    if(!a) return b;
+    return new Date(a.date||0) > new Date(b.date||0) ? a : b;
+  }, null);
+  box.innerHTML = '<div class="rows">' + list.map((it, i) => `
+    <div class="row">
+      <div class="idx">${String(i+1).padStart(2,'0')}</div>
+      <div class="fname">
+        <b title="${esc(it.name)}">${esc(it.name)}</b>
+        ${newest && it.key === newest.key ? '<span class="tag-new">NEW</span>' : ''}
+      </div>
+      <div class="fsize">${fmtSize(it.size)}</div>
+      <div class="fdate">${fmtDate(it.date)}</div>
+      <div class="facts">
+        <button class="btn solid" type="button" data-dl="${esc(it.key)}">下载</button>
+        <button class="btn text" type="button" data-copy="${esc(it.key)}">复制链接</button>
+        <button class="btn text danger" type="button" data-del="${esc(it.key)}">删除</button>
+      </div>
+    </div>`).join('') + '</div>';
+}
+
+/* ---------- 删除 ---------- */
+let pendingDel = null, pendingDelTimer = null;
+function askDelete(key){
+  if(!isUnlocked()){ openGate(() => armDelete(key)); toast('删除需要超级管理员密码'); return; }
+  armDelete(key);
+}
+function armDelete(key){
+  clearTimeout(pendingDelTimer);
+  if(pendingDel){
+    const prev = document.querySelector(`[data-del="${CSS.escape(pendingDel)}"]`);
+    if(prev){ prev.classList.remove('confirm'); prev.textContent = '删除'; }
+  }
+  pendingDel = key;
+  const btn = document.querySelector(`[data-del="${CSS.escape(key)}"]`);
+  if(btn){ btn.classList.add('confirm'); btn.textContent = '确认删除'; }
+  toast('再点一次「确认删除」· 4 秒后取消');
+  pendingDelTimer = setTimeout(() => {
+    const b2 = document.querySelector(`[data-del="${CSS.escape(key)}"]`);
+    if(b2){ b2.classList.remove('confirm'); b2.textContent = '删除'; }
+    pendingDel = null;
+  }, 4000);
+}
+async function doDelete(key){
+  clearTimeout(pendingDelTimer);
+  pendingDel = null;
+  const it = items.find(x => x.key === key);
+  if(!it) return;
+  const btn = document.querySelector(`[data-del="${CSS.escape(key)}"]`);
+  if(btn){ btn.disabled = true; btn.textContent = '删除中'; }
+  try{
+    const { error } = await sb.storage.from(cfg.bucket).remove([it.path]);
+    if(error) throw error;
+    await dropFromManifest(key);
+    toast('已删除 ' + it.name);
+    await refresh();
+  }catch(e){
+    toast('删除失败：' + humanError(e), true);
+    if(btn){ btn.disabled = false; btn.textContent = '删除'; }
+  }
+}
+
+/* ---------- 下载 ---------- */
+async function download(key){
+  const it = items.find(x => x.key === key);
+  if(!it) return;
+  const btn = document.querySelector(`[data-dl="${CSS.escape(key)}"]`);
+  const label = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '准备中'; }
+  let url = '';
+  try{
+    const signed = await sb.storage.from(cfg.bucket).createSignedUrl(it.path, 120);
+    if(!signed.error && signed.data && signed.data.signedUrl){
+      /* 自己拼 download 参数并只编码一次，避免 SDK 二次编码导致中文名变 %E5… */
+      url = signed.data.signedUrl + '&download=' + encodeURIComponent(it.name);
+    }
+  }catch(e){ /* 落到公开链接 */ }
+  if(!url){
+    const pub = sb.storage.from(cfg.bucket).getPublicUrl(it.path).data.publicUrl;
+    url = pub + '?download=' + encodeURIComponent(it.name);
+  }
+  try{
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = it.name;
+    a.rel = 'noopener';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 800);
+    toast('开始下载 ' + it.name);
+  }catch(e){
+    toast('下载失败：' + humanError(e), true);
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = label || '下载'; }
+  }
+}
+
+function copyLink(key){
+  const it = items.find(x => x.key === key);
+  if(!it) return;
+  const url = sb.storage.from(cfg.bucket).getPublicUrl(it.path).data.publicUrl + '?download=' + encodeURIComponent(it.name);
+  const done = () => toast('直链已复制');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(done).catch(() => fallbackCopy(url, done));
+  }else fallbackCopy(url, done);
+}
+function fallbackCopy(text, done){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try{ document.execCommand('copy'); done(); }
+  catch(e){ toast('复制失败，请手动复制直链', true); }
+  ta.remove();
+}
+
+/* ---------- 上传 ---------- */
+function addUpload(file){
+  const id = 'u' + Math.random().toString(36).slice(2, 9);
+  const row = {
+    id, name: file.name, size: file.size, pct: 0,
+    status: 'wait', msg: '排队中', abort: null, file
+  };
+  uploads.push(row);
+  renderQueue();
+  runUpload(row);
+  return id;
+}
+
+async function runUpload(row){
+  const key = storageKey(row.name);
+  const path = fullPath(key);
+  row.status = 'uploading';
+  row.msg = row.size > CHUNK ? '分片上传中' : '上传中';
+  renderQueue();
+
+  try{
+    if(row.size > CHUNK && typeof tus !== 'undefined'){
+      await tusUpload(row, path);
+    }else{
+      await stdUpload(row, path);
+    }
+    await writeManifest(key, row.name);
+    row.status = 'done';
+    row.pct = 100;
+    row.msg = '已入库 · ' + fmtSize(row.size);
+    renderQueue();
+    toast('已上传 ' + row.name);
+    refresh();
+    setTimeout(() => {
+      uploads = uploads.filter(x => x.id !== row.id);
+      renderQueue();
+    }, 6000);
+  }catch(e){
+    if(row.status === 'aborted') return;
+    row.status = 'error';
+    row.msg = humanError(e);
+    renderQueue();
+    toast('上传失败：' + humanError(e), true);
+  }
+}
+
+function tusUpload(row, path){
+  return new Promise((resolve, reject) => {
+    if(row.status === 'aborted') return reject(new Error('已取消'));
+    const up = new tus.Upload(row.file, {
+      endpoint: cfg.url + '/storage/v1/upload/resumable',
+      retryDelays: [0, 3000, 5000, 10000],
+      headers: { authorization: 'Bearer ' + cfg.key, 'x-upsert': 'true' },
+      uploadDataDuringCreation: true,
+      removeFingerprintOnSuccess: true,
+      chunkSize: CHUNK,
+      metadata: {
+        bucketName: cfg.bucket,
+        objectName: path,
+        contentType: MIME,
+        cacheControl: '3600',
+        originalName: row.name
+      },
+      onProgress: (bytes, total) => {
+        row.pct = Math.min(99, Math.round(bytes / total * 100));
+        row.msg = '分片上传中 · ' + fmtSize(bytes) + ' / ' + fmtSize(total);
+        renderQueue();
+      },
+      onSuccess: () => resolve(),
+      onError: (err) => reject(err)
+    });
+    row.abort = () => { try{ up.abort(); }catch(e){} row.status = 'aborted'; };
+    up.start();
+  });
+}
+
+async function stdUpload(row, path){
+  const pctTimer = setInterval(() => {
+    if(row.pct < 88) { row.pct += Math.max(1, Math.round((88 - row.pct) / 9)); renderQueue(); }
+  }, 320);
+  try{
+    const { error } = await sb.storage.from(cfg.bucket).upload(path, row.file, {
+      contentType: MIME,
+      upsert: true,
+      cacheControl: '3600'
+    });
+    if(error) throw error;
+    row.pct = 100;
+  }finally{
+    clearInterval(pctTimer);
+  }
+}
+
+function renderQueue(){
+  const box = document.getElementById('queue');
+  box.innerHTML = uploads.map(u => `
+    <div class="q-row" data-s="${u.status}">
+      <div class="q-top">
+        <div class="q-name" title="${esc(u.name)}">${esc(u.name)}</div>
+        <div class="q-pct">${u.status === 'error' ? '失败' : u.status === 'aborted' ? '已取消' : u.pct + '%'}</div>
+        ${u.status === 'uploading' && u.abort ? '<button class="q-cancel" type="button" data-cancel="' + u.id + '">取消</button>' : ''}
+      </div>
+      <div class="q-track"><div class="q-fill" style="width:${u.pct}%"></div></div>
+      <div class="q-msg">${esc(u.msg)}</div>
+    </div>`).join('');
+}
+
+/* ---------- 事件绑定 ---------- */
+const bay = document.getElementById('bay');
+const fileInput = document.getElementById('file');
+let dragDepth = 0;
+
+function pick(){ fileInput.click(); }
+bay.addEventListener('click', pick);
+bay.addEventListener('keydown', e => {
+  if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); pick(); }
+});
+document.getElementById('btn-pick').addEventListener('click', e => {
+  e.stopPropagation(); pick();
+});
+
+['dragenter','dragover','dragleave','drop'].forEach(ev => {
+  bay.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); });
+});
+bay.addEventListener('dragenter', () => { dragDepth++; bay.classList.add('over'); });
+bay.addEventListener('dragleave', () => { dragDepth--; if(dragDepth <= 0){ dragDepth = 0; bay.classList.remove('over'); } });
+bay.addEventListener('drop', e => {
+  dragDepth = 0;
+  bay.classList.remove('over');
+  handleFiles(e.dataTransfer && e.dataTransfer.files);
+});
+
+fileInput.addEventListener('change', () => {
+  handleFiles(fileInput.files);
+  fileInput.value = '';
+});
+
+function handleFiles(files){
+  if(!files || !files.length) return;
+  if(!sb){ toast('还没连接上 Supabase', true); return; }
+  [...files].forEach(f => {
+    if(!isApk(f.name)){ toast('跳过「' + f.name + '」：不是 .apk 文件', true); return; }
+    if(f.size === 0){ toast('跳过「' + f.name + '」：空文件', true); return; }
+    addUpload(f);
+  });
+}
+
+document.getElementById('btn-refresh').addEventListener('click', () => { refresh(); toast('已重新读取仓库'); });
+document.getElementById('q').addEventListener('input', e => { query = e.target.value; renderList(); });
+document.getElementById('sort').addEventListener('change', e => { sortBy = e.target.value; renderList(); });
+
+document.getElementById('list').addEventListener('click', e => {
+  const dl = e.target.closest('[data-dl]');
+  if(dl){ download(dl.dataset.dl); return; }
+  const cp = e.target.closest('[data-copy]');
+  if(cp){ copyLink(cp.dataset.copy); return; }
+  const de = e.target.closest('[data-del]');
+  if(de){
+    const key = de.dataset.del;
+    if(pendingDel === key) doDelete(key);
+    else askDelete(key);
+  }
+});
+
+document.getElementById('queue').addEventListener('click', e => {
+  const c = e.target.closest('[data-cancel]');
+  if(!c) return;
+  const u = uploads.find(x => x.id === c.dataset.cancel);
+  if(u && u.abort){ u.abort(); u.msg = '已取消'; renderQueue(); }
+});
+
+/* ---------- 配置抽屉 ---------- */
+const drawer = document.getElementById('drawer');
+const scrim = document.getElementById('scrim');
+function openDrawer(){
+  document.getElementById('c-url').value = cfg.url;
+  document.getElementById('c-key').value = cfg.key;
+  document.getElementById('c-bucket').value = cfg.bucket;
+  document.getElementById('c-folder').value = cfg.folder;
+  drawer.classList.add('on');
+  drawer.setAttribute('aria-hidden','false');
+  scrim.classList.add('on');
+  document.getElementById('c-url').focus();
+}
+function closeDrawer(){
+  drawer.classList.remove('on');
+  drawer.setAttribute('aria-hidden','true');
+  scrim.classList.remove('on');
+}
+/* ---------- 配置加密：超级管理员密码门 ---------- */
+/* 与参考文件 FileHub 同一套哈希：super 账号 123456 / pass_hash 84afae2419705676 */
+const ADMIN_HASH = '84afae2419705676';
+const UNLOCK_TTL = 30 * 60 * 1000;
+let unlockedUntil = 0;
+
+function hashPassword(str){
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for(let i = 0; i < str.length; i++){
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16) + (h1 >>> 0).toString(16);
+}
+function isUnlocked(){ return unlockedUntil > Date.now(); }
+
+const gate = document.getElementById('gate');
+const gatePass = document.getElementById('gate-pass');
+const gateMsg = document.getElementById('gate-msg');
+let gateThen = null;
+let gateFails = 0;
+
+function openGate(then){
+  gateThen = then || null;
+  gateMsg.textContent = '';
+  gatePass.value = '';
+  gate.classList.add('on');
+  gate.setAttribute('aria-hidden','false');
+  setTimeout(() => gatePass.focus(), 60);
+}
+function closeGate(){
+  gate.classList.remove('on');
+  gate.setAttribute('aria-hidden','true');
+  gateThen = null;
+  gateMsg.textContent = '';
+  gatePass.value = '';
+}
+async function verifyAdmin(pw){
+  const h = hashPassword(pw);
+  if(h === ADMIN_HASH) return true;
+  /* 也接受主库里 role=super 账号的当前密码，改过密码后仍然有效 */
+  try{
+    if(sb){
+      const { data, error } = await sb.from('users').select('pass_hash').eq('role','super');
+      if(!error && data) return data.some(u => u.pass_hash === h);
+    }
+  }catch(e){ /* 表不可读时只认内置哈希 */ }
+  return false;
+}
+
+async function submitGate(){
+  const pw = gatePass.value;
+  if(!pw){ gateMsg.textContent = '请输入密码'; return; }
+  const btn = document.getElementById('gate-ok');
+  btn.disabled = true;
+  gateMsg.textContent = '校验中…';
+  const ok = await verifyAdmin(pw);
+  btn.disabled = false;
+  if(!ok){
+    gateFails++;
+    gateMsg.textContent = gateFails >= 3 ? '密码不对 · 已连续 ' + gateFails + ' 次错误' : '密码不对';
+    gatePass.select();
+    return;
+  }
+  gateFails = 0;
+  unlockedUntil = Date.now() + UNLOCK_TTL;
+  const next = gateThen;
+  closeGate();
+  toast('已解锁 · 30 分钟内有效');
+  if(typeof next === 'function') next();
+}
+
+document.getElementById('btn-cfg').addEventListener('click', () => {
+  if(isUnlocked()) openDrawer();
+  else openGate(openDrawer);
+});
+document.getElementById('gate-ok').addEventListener('click', submitGate);
+document.getElementById('gate-cancel').addEventListener('click', closeGate);
+document.getElementById('gate-close').addEventListener('click', closeGate);
+gatePass.addEventListener('keydown', e => { if(e.key === 'Enter') submitGate(); });
+gate.addEventListener('click', e => { if(e.target === gate) closeGate(); });
+document.getElementById('gate-eye').addEventListener('click', e => {
+  const shown = gatePass.type === 'text';
+  gatePass.type = shown ? 'password' : 'text';
+  e.currentTarget.textContent = shown ? '显示' : '隐藏';
+});
+
+/* 抽屉里的密钥掩码开关 + 立即锁定 */
+document.getElementById('btn-eye').addEventListener('click', e => {
+  const inp = document.getElementById('c-key');
+  const shown = inp.type === 'text';
+  inp.type = shown ? 'password' : 'text';
+  e.currentTarget.textContent = shown ? '显示' : '隐藏';
+});
+document.getElementById('btn-lock').addEventListener('click', () => {
+  unlockedUntil = 0;
+  closeDrawer();
+  toast('配置已锁定');
+});
+/* 解锁到期时若抽屉还开着，立即收起 */
+setInterval(() => {
+  if(unlockedUntil && !isUnlocked() && drawer.classList.contains('on')){
+    closeDrawer();
+    toast('解锁已过期，配置重新上锁');
+  }
+}, 60 * 1000);
+
+document.getElementById('btn-close').addEventListener('click', closeDrawer);
+scrim.addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeDrawer(); });
+
+document.getElementById('btn-save').addEventListener('click', () => {
+  const url = document.getElementById('c-url').value.trim().replace(/\/+$/,'');
+  const key = document.getElementById('c-key').value.trim();
+  if(!/^https:\/\/.+\.supabase\.(co|in)$/.test(url)){ toast('Project URL 格式不对，应形如 https://xxxx.supabase.co', true); return; }
+  if(!key){ toast('缺少 anon / publishable 密钥', true); return; }
+  saveCfg({
+    url,
+    key,
+    bucket: document.getElementById('c-bucket').value.trim() || DEFAULTS.bucket,
+    folder: document.getElementById('c-folder').value.trim().replace(/^\/+|\/+$/g,'')
+  });
+  closeDrawer();
+  toast('配置已保存');
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  localStorage.removeItem(CFG_KEY);
+  cfg = {...DEFAULTS};
+  document.getElementById('c-url').value = cfg.url;
+  document.getElementById('c-key').value = cfg.key;
+  document.getElementById('c-bucket').value = cfg.bucket;
+  document.getElementById('c-folder').value = cfg.folder;
+  mount();
+  toast('已恢复默认配置');
+});
+
+document.getElementById('btn-copy-sql').addEventListener('click', () => {
+  const txt = document.getElementById('sql').textContent;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(() => toast('SQL 已复制')).catch(() => fallbackCopy(txt, () => toast('SQL 已复制')));
+  }else fallbackCopy(txt, () => toast('SQL 已复制'));
+});
+
+/* ---------- 启动 ---------- */
+updatePaths();
+mount();
+</script>
+</body>
+</html>
